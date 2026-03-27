@@ -89,8 +89,8 @@ let currentChatText = "";
 
 function openDetailPanel(id, data) { // 提供頁面格式 載入資料進來
 
-    document.getElementById("chat_input").value = "";
-    document.getElementById("big_textarea").value = ""; // 大型輸入框也清空重置
+    //document.getElementById("chat_input").value = "";
+    //document.getElementById("big_textarea").value = ""; // 大型輸入框也清空重置
 
     const overlay = document.getElementById("overlay");
     overlay.classList.add("open");
@@ -529,9 +529,11 @@ const bigBox = document.getElementById("big_input_box");
 
 document.getElementById("toggle_big_input").addEventListener("click", () => {
     bigBox.classList.toggle("open"); // 切換 (如果已經open 就把open移掉)
+    //toggle_big_input.style = "background:red";
 });
 
-// 把大型輸入框的內容傳給聊天
+/*
+// 把大型輸入框的內容傳給聊天 (套用)
 document.getElementById("apply_big_text").addEventListener("click", () => {
     const bigText = document.getElementById("big_textarea").value;
 
@@ -544,6 +546,42 @@ document.getElementById("apply_big_text").addEventListener("click", () => {
     // 觸發自動高度調整
     chatInput.dispatchEvent(new Event("input"));
 });
+*/
+document.getElementById("apply_big_text").addEventListener("click", async () => {
+
+    const bigText = document.getElementById("big_textarea").value.trim();
+    if (!bigText) return;
+
+    const panel = document.getElementById("detail_panel");
+    const noteId = panel.dataset.id;
+
+    if (!noteId) return;
+
+    try {
+        // 直接寫進 chats
+        await addDoc(collection(db, "notes", noteId, "chats"), {
+            text: bigText,
+            createdAt: serverTimestamp()
+        });
+
+        // 更新 note 排序
+        await updateDoc(doc(db, "notes", noteId), {
+            updatedAt: serverTimestamp()
+        });
+
+        // 清空大型輸入框
+        document.getElementById("big_textarea").value = "";
+
+        // 關閉大型輸入框（可選）
+        //document.getElementById("big_input_box").classList.remove("open");
+
+        //toastr.success("已送出！");
+
+    } catch (error) {
+        console.error("送出失敗:", error);
+        toastr.error("送出失敗");
+    }
+});
 
 // 關閉大型輸入框
 document.getElementById("close_big_text").addEventListener("click", () => {
@@ -554,3 +592,6 @@ document.getElementById("close_big_text").addEventListener("click", () => {
 document.getElementById("clear_big_text").addEventListener("click", () => {
     document.getElementById("big_textarea").value = ""; 
 });
+
+
+
