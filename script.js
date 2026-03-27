@@ -673,7 +673,7 @@ document.getElementById("restore_file").addEventListener("change", async (e) => 
     const file = e.target.files[0];
     if (!file) return;
 
-    const confirmRestore = confirm("⚠️ 這會清除所有現有資料，確定要匯入嗎？");
+    const confirmRestore = confirm("這會清除所有現有資料，確定要匯入嗎？");
     if (!confirmRestore) return;
 
     const text = await file.text();
