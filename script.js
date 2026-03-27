@@ -595,3 +595,55 @@ document.getElementById("clear_big_text").addEventListener("click", () => {
 
 
 
+// 匯出備份
+document.getElementById("backup_btn").addEventListener("click", async () => {
+    try {
+        const notesSnapshot = await getDocs(collection(db, "notes"));
+
+        const backupData = [];
+
+        for (const noteDoc of notesSnapshot.docs) {
+            const noteData = noteDoc.data();
+
+            // 抓 chats 子集合
+            const chatsSnapshot = await getDocs(
+                collection(db, "notes", noteDoc.id, "chats")
+            );
+
+            const chats = chatsSnapshot.docs.map(chatDoc => ({
+                id: chatDoc.id,
+                ...chatDoc.data()
+            }));
+
+            backupData.push({
+                id: noteDoc.id,
+                ...noteData,
+                chats
+            });
+        }
+
+        // 轉 JSON
+        const json = JSON.stringify(backupData, null, 2);
+
+        // 下載
+        const blob = new Blob([json], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "firestore-backup.json";
+        a.click();
+
+        URL.revokeObjectURL(url);
+
+        toastr.success("備份完成！");
+
+    } catch (error) {
+        console.error("備份失敗:", error);
+        toastr.error("備份失敗");
+    }
+});
+
+
+
+
