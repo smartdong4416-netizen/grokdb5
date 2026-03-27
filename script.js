@@ -13,6 +13,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
  
 import { onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"; // 因為匯入時時間會亂
  
  
 // Firebase 設定
@@ -290,7 +291,7 @@ document.getElementById("send_chat_btn").addEventListener("click", async () => {
         input.value = "";
         input.style.height = "auto";   // 這樣送出訊息後高度才會調回來
 
-        document.getElementById("big_textarea").value = ""; //清空大型輸入框內容
+        //document.getElementById("big_textarea").value = ""; //清空大型輸入框內容
 
     } catch (error) {
         console.error("聊天新增失敗:", error);
@@ -631,7 +632,8 @@ document.getElementById("backup_btn").addEventListener("click", async () => {
 
         const a = document.createElement("a");
         a.href = url;
-        a.download = "firestore-backup.json";
+        const filename = `firestore-backup-${getCurrentDateTimeString()}.json`;
+        a.download = filename;
         a.click();
 
         URL.revokeObjectURL(url);
@@ -644,6 +646,100 @@ document.getElementById("backup_btn").addEventListener("click", async () => {
     }
 });
 
+// 取得當前時間
+function getCurrentDateTimeString() {
+    const now = new Date();
+
+    const pad = (n) => n.toString().padStart(2, "0");
+
+    const year = now.getFullYear();
+    const month = pad(now.getMonth() + 1);
+    const day = pad(now.getDate());
+
+    const hours = pad(now.getHours());
+    const minutes = pad(now.getMinutes());
+    const seconds = pad(now.getSeconds());
+
+    return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
+}
 
 
+// 匯入前詢問與讀取json
+document.getElementById("restore_btn").addEventListener("click", () => {
+    document.getElementById("restore_file").click();
+});
 
+document.getElementById("restore_file").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const confirmRestore = confirm("⚠️ 這會清除所有現有資料，確定要匯入嗎？");
+    if (!confirmRestore) return;
+
+    const text = await file.text();
+    const data = JSON.parse(text);
+
+    await clearFirestore();   // ⭐ 先清空
+    await restoreBackup(data); // ⭐ 再匯入
+
+    e.target.value = ""; // 清掉上傳的檔案
+
+    toastr.success("匯入完成！");
+});
+
+// 清空資料庫
+async function clearFirestore() {
+    const notesSnapshot = await getDocs(collection(db, "notes"));
+
+    for (const noteDoc of notesSnapshot.docs) {
+
+        // 先刪 chats 子集合
+        const chatsSnapshot = await getDocs(
+            collection(db, "notes", noteDoc.id, "chats")
+        );
+
+        await Promise.all(
+            chatsSnapshot.docs.map(chatDoc => deleteDoc(chatDoc.ref))
+        );
+
+        // 再刪 note
+        await deleteDoc(doc(db, "notes", noteDoc.id));
+    }
+}
+
+// 還原資料
+async function restoreBackup(data) {
+    for (const note of data) {
+
+        const noteRef = await addDoc(collection(db, "notes"), {
+            title: note.title,
+            category: note.category,
+            summary: note.summary,
+            createdAt: convertTimestamp(note.createdAt),
+            updatedAt: convertTimestamp(note.updatedAt)
+        });
+
+        if (note.chats && note.chats.length > 0) {
+            await Promise.all(
+                note.chats.map(chat =>
+                    addDoc(collection(db, "notes", noteRef.id, "chats"), {
+                        text: chat.text,
+                        createdAt: convertTimestamp(chat.createdAt)
+                    })
+                )
+            );
+        }
+    }
+}
+
+// 匯入時間修正
+function convertTimestamp(ts) {
+    if (!ts) return serverTimestamp();
+
+    // Firestore Timestamp JSON → 轉回 Timestamp
+    if (ts.seconds !== undefined) {
+        return new Timestamp(ts.seconds, ts.nanoseconds || 0);
+    }
+
+    return serverTimestamp();
+}
